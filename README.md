@@ -6,7 +6,7 @@ docker pull ghcr.io/bytedjinn/silo:latest
 docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest 
 docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest bob
 docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest bob e bob is a painter
-docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest bob t today bob went to the shops
+docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest bob t today bob went for a run
 ```
 where `<path>` is the absolute path to a "data" folder you created. 
 
