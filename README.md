@@ -27,10 +27,12 @@ Run `notepad $PROFILE`.
 Add the text:
 ```
 function silo {
-    param (
-        [string[]]$Args
-    )
-    docker run -v <path> ghcr.io/bytedjinn/silo:latest @Args
+
+    $baseCommand = 'docker run -v "<path>:/usr/src/app/data" ghcr.io/bytedjinn/silo:latest'
+    $fullCommand = $baseCommand + " " + ($Args -join " ")
+    
+    Invoke-Expression $fullCommand
 }
+
 ```
 Run `. $PROFILE`. 
