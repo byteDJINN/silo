@@ -159,13 +159,14 @@ void addTransientEntry(const std::string &person, std::string &entry)
 
 void printUsage()
 {
-    std::cout << "Usage:" << std::endl;
-    std::cout << "  silo" << std::endl;
-    std::cout << "  silo <person>" << std::endl;
-    std::cout << "  silo <person> eternal <entry>" << std::endl;
-    std::cout << "  silo <person> e <entry>" << std::endl;
-    std::cout << "  silo <person> transient <entry>" << std::endl;
-    std::cout << "  silo <person> t <entry>" << std::endl;
+    // Print usage instructions
+    std::cout << "Usage: \n";
+    std::cout << "  program_name\n";
+    std::cout << "  program_name <person>\n";
+    std::cout << "  program_name <person> <command> <entry>\n";
+    std::cout << "Commands:\n";
+    std::cout << "  eternal, e   Edit eternal info\n";
+    std::cout << "  transient, t Add transient entry\n";
 }
 
 int main(int argc, char *argv[])
@@ -181,11 +182,20 @@ int main(int argc, char *argv[])
         std::string person = argv[1];
         showPersonInfo(person);
     }
-    else if (argc == 4)
+    else if (argc >= 4)
     {
         std::string person = argv[1];
         std::string command = argv[2];
-        std::string entry = argv[3];
+        std::string entry;
+
+        for (int i = 3; i < argc; ++i)
+        {
+            if (i > 3)
+            {
+                entry += " ";
+            }
+            entry += argv[i];
+        }
 
         if (command == "eternal" || command == "e")
         {

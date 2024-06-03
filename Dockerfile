@@ -7,8 +7,7 @@ RUN apk add --no-cache g++ make
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Copy the source code into the container
-COPY . .
+COPY silo.cpp ./
 
 # Compile the C++ code
 RUN g++ -o silo silo.cpp
