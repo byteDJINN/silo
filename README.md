@@ -1,7 +1,7 @@
 ## Running
 
 ### Pulling and running
-```bash
+```
 docker pull ghcr.io/bytedjinn/silo:latest
 docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest 
 docker run -v <path>:/usr/src/app/data ghcr.io/bytedjinn/silo:latest bob
@@ -14,7 +14,7 @@ It is recommended to create an alias of the prefix.
 
 
 ### Building and running
-```bash
+```
 docker run --rm -i -v ${pwd}/data:/usr/src/app/data $(docker build -q .) foo eternal bar
 
 ```
