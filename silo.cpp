@@ -238,7 +238,7 @@ void showPersonInfo(const std::string &person)
     auto it1 = eternalData.find(person);
     if (it1 != eternalData.end() && !it1->second.empty())
     {
-        std::cout << it1->second.front().text << std::endl;
+        std::cout << it1->second.back().text << std::endl;
     }
 
     std::cout << std::endl;
@@ -247,10 +247,10 @@ void showPersonInfo(const std::string &person)
     auto it2 = transientData.find(person);
     if (it2 != transientData.end())
     {
-        for (const TransientEntry &entry : it2->second)
+        for (auto it = it2->second.rbegin(); it != it2->second.rend(); ++it)
         {
-            std::time_t time = std::chrono::system_clock::to_time_t(entry.timestamp);
-            std::cout << "  " << std::put_time(std::localtime(&time), "%Y-%m-%d") << ": " << entry.text << std::endl;
+            std::time_t time = std::chrono::system_clock::to_time_t(it->timestamp);
+            std::cout << "  " << std::put_time(std::localtime(&time), "%Y-%m-%d") << ": " << it->text << std::endl;
         }
     }
 
