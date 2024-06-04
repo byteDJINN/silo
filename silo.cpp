@@ -6,6 +6,7 @@
 #include <string>
 #include <sstream>
 #include <chrono>
+#include <regex>
 #include "deps/json.hpp"
 // Define the Entry struct
 struct Entry
@@ -87,6 +88,9 @@ public:
 
         for (const auto &entry : std::filesystem::directory_iterator(DATA_FOLDER))
         {
+            if (entry.path().filename() == BACKUP_FOLDER.substr(BACKUP_FOLDER.find_last_of("/") + 1))
+                continue;
+
             std::ifstream file(entry.path());
             if (!file.is_open())
                 continue;
@@ -105,6 +109,8 @@ public:
     void saveData(const std::string &person)
     {
         ensureDataFolderExists();
+        backupData(person);
+
         nlohmann::json j;
         j["eternal"] = eternalData[person];
         j["transient"] = transientData[person];
@@ -144,6 +150,8 @@ public:
 
 private:
     const std::string DATA_FOLDER = "data";
+    const std::string BACKUP_FOLDER = DATA_FOLDER + "/backups";
+    const int MAX_BACKUPS = 5;
     std::unordered_map<std::string, std::vector<EternalEntry>> eternalData;
     std::unordered_map<std::string, std::vector<TransientEntry>> transientData;
 
@@ -158,6 +166,40 @@ private:
         if (!std::filesystem::exists(DATA_FOLDER))
         {
             std::filesystem::create_directory(DATA_FOLDER);
+        }
+        if (!std::filesystem::exists(BACKUP_FOLDER))
+        {
+            std::filesystem::create_directory(BACKUP_FOLDER);
+        }
+    }
+
+    void backupData(const std::string &person)
+    {
+        std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&now), "%Y%m%d%H%M%S");
+        std::string timestamp = ss.str();
+
+        std::string backupFilePath = BACKUP_FOLDER + "/" + person + "_" + timestamp + ".json";
+        std::ifstream src(DATA_FOLDER + "/" + person + ".json", std::ios::binary);
+        std::ofstream dst(backupFilePath, std::ios::binary);
+        dst << src.rdbuf();
+
+        // Keep only the 5 most recent backups
+        std::vector<std::filesystem::directory_entry> backups;
+        for (const auto &entry : std::filesystem::directory_iterator(BACKUP_FOLDER))
+        {
+            if (entry.path().stem().string().find(person) == 0)
+            {
+                backups.push_back(entry);
+            }
+        }
+        std::sort(backups.begin(), backups.end(), [](const auto &a, const auto &b)
+                  { return std::filesystem::last_write_time(a) > std::filesystem::last_write_time(b); });
+
+        for (size_t i = MAX_BACKUPS; i < backups.size(); ++i)
+        {
+            std::filesystem::remove(backups[i]);
         }
     }
 };
@@ -199,6 +241,8 @@ void showPersonInfo(const std::string &person)
         std::cout << it1->second.front().text << std::endl;
     }
 
+    std::cout << std::endl;
+
     std::cout << "Transient: " << std::endl;
     auto it2 = transientData.find(person);
     if (it2 != transientData.end())
@@ -209,6 +253,8 @@ void showPersonInfo(const std::string &person)
             std::cout << "  " << std::put_time(std::localtime(&time), "%Y-%m-%d") << ": " << entry.text << std::endl;
         }
     }
+
+    std::cout << std::endl;
 }
 
 void editEternalInfo(const std::string &person, const std::string &entry)
@@ -238,18 +284,19 @@ void addTransientEntry(const std::string &person, const std::string &entry)
 void printUsage()
 {
     // Print usage instructions
-    std::cout << "Usage: \n";
+    std::cout << "\nUsage: \n";
     std::cout << "  program_name\n";
-    std::cout << "  program_name <person>\n";
-    std::cout << "  program_name <person> <command> <entry>\n";
+    std::cout << "  program_name  <person>\n";
+    std::cout << "  program_name  <person> <command> <entry>\n";
     std::cout << "Commands:\n";
-    std::cout << "  eternal, e   Edit eternal info\n";
-    std::cout << "  transient, t Add transient entry\n";
+    std::cout << "  eternal, e    Edit eternal info\n";
+    std::cout << "  transient, t  Add transient entry\n\n";
 }
 
 int main(int argc, char *argv[])
 {
     DataManager &dataManager = DataManager::getInstance();
+    std::regex nameRegex("^[a-zA-Z]+$");
 
     if (argc == 1)
     {
@@ -258,11 +305,23 @@ int main(int argc, char *argv[])
     else if (argc == 2)
     {
         std::string person = argv[1];
+        if (!std::regex_match(person, nameRegex))
+        {
+            std::cout << "Invalid person" << std::endl;
+            printUsage();
+            return 1;
+        }
         showPersonInfo(person);
     }
     else if (argc >= 4)
     {
         std::string person = argv[1];
+        if (!std::regex_match(person, nameRegex))
+        {
+            std::cout << "Invalid person" << std::endl;
+            printUsage();
+            return 1;
+        }
         std::string command = argv[2];
         std::string entry;
 
