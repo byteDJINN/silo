@@ -16,6 +16,7 @@ It is recommended to create an alias of the prefix.
 ### Building and running
 ```
 docker run --rm -i -v ${pwd}/data:/usr/src/app/data $(docker build -q .) foo eternal bar
+docker build -t ghcr.io/bytedjinn/silo:latest . && docker run --rm -v ${pwd}/data:/usr/src/app/data ghcr.io/bytedjinn/silo:latest foo eternal bar
 
 ```
 

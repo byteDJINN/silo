@@ -8,6 +8,7 @@ RUN apk add --no-cache g++ make
 WORKDIR /usr/src/app
 
 COPY silo.cpp ./
+COPY deps ./deps
 
 # Compile the C++ code
 RUN g++ -o silo silo.cpp

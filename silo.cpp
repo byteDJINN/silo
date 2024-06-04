@@ -5,92 +5,171 @@
 #include <vector>
 #include <string>
 #include <sstream>
-
-namespace fs = std::filesystem;
-
-const std::string DATA_FOLDER = "data";
-
-std::unordered_map<std::string, std::vector<std::string>> eternalData;
-std::unordered_map<std::string, std::vector<std::string>> transientData;
-
-void ensureDataFolderExists()
+#include <chrono>
+#include "deps/json.hpp"
+// Define the Entry struct
+struct Entry
 {
-    if (!fs::exists(DATA_FOLDER))
-    {
-        fs::create_directory(DATA_FOLDER);
-    }
+    std::string text;
+    std::chrono::system_clock::time_point timestamp;
+
+    // Default constructor 
+    Entry() {}
+
+    // Parameterized constructor
+    Entry(const std::string &text, const std::chrono::system_clock::time_point &timestamp) : text(text), timestamp(timestamp) {}
+};
+
+// Define the EternalEntry struct, inheriting from Entry
+struct EternalEntry : public Entry
+{
+    // Default constructor 
+    EternalEntry() {}
+
+    // Inherit Entry's parameterized constructor
+    using Entry::Entry;
+};
+
+// Define the TransientEntry struct, inheriting from Entry
+struct TransientEntry : public Entry
+{
+    // Default constructor
+    TransientEntry() {}
+
+    // Inherit Entry's parameterized constructor
+    using Entry::Entry;
+};
+
+// All these json functions are for nlohmann to know how to serialize and deserialize the structs
+
+// JSON deserialization for EternalEntry
+void from_json(const nlohmann::json &j, EternalEntry &e)
+{
+    j.at("text").get_to(e.text);
+    e.timestamp = std::chrono::system_clock::from_time_t(j.at("timestamp").get<std::time_t>());
 }
 
-void loadData()
+// JSON deserialization for TransientEntry
+void from_json(const nlohmann::json &j, TransientEntry &e)
 {
-    ensureDataFolderExists();
+    j.at("text").get_to(e.text);
+    e.timestamp = std::chrono::system_clock::from_time_t(j.at("timestamp").get<std::time_t>());
+}
 
-    for (const auto &entry : fs::directory_iterator(DATA_FOLDER))
+// JSON serialization for EternalEntry
+void to_json(nlohmann::json &j, const EternalEntry &e)
+{
+    j = nlohmann::json{{"text", e.text}, {"timestamp", std::chrono::system_clock::to_time_t(e.timestamp)}};
+}
+
+// JSON serialization for TransientEntry
+void to_json(nlohmann::json &j, const TransientEntry &e)
+{
+    j = nlohmann::json{{"text", e.text}, {"timestamp", std::chrono::system_clock::to_time_t(e.timestamp)}};
+}
+
+class DataManager
+{
+public:
+    // singleton pattern
+    static DataManager &getInstance()
     {
-        std::ifstream file(entry.path());
-        if (!file.is_open())
-            continue;
+        static DataManager instance;
+        return instance;
+    }
 
-        std::string person = entry.path().stem().string();
-        std::string line;
-        std::vector<std::string> eternal;
-        std::vector<std::string> transient;
-        bool isTransient = false;
+    DataManager(const DataManager &) = delete;
+    DataManager &operator=(const DataManager &) = delete;
 
-        while (std::getline(file, line))
+    void loadData()
+    {
+        ensureDataFolderExists();
+
+        for (const auto &entry : std::filesystem::directory_iterator(DATA_FOLDER))
         {
-            if (line.empty() && file.peek() == '\n')
-            {
-                isTransient = true;
-                file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::ifstream file(entry.path());
+            if (!file.is_open())
                 continue;
-            }
 
-            if (isTransient)
-            {
-                transient.push_back(line);
-            }
-            else
-            {
-                eternal.push_back(line);
-            }
+            std::string person = entry.path().stem().string();
+            nlohmann::json j;
+            file >> j;
+
+            eternalData[person] = j["eternal"].get<std::vector<EternalEntry>>();
+            transientData[person] = j["transient"].get<std::vector<TransientEntry>>();
+
+            file.close();
+        }
+    }
+
+    void saveData(const std::string &person)
+    {
+        ensureDataFolderExists();
+        nlohmann::json j;
+        j["eternal"] = eternalData[person];
+        j["transient"] = transientData[person];
+
+        std::ofstream file(DATA_FOLDER + "/" + person + ".json");
+        if (!file.is_open())
+        {
+            std::cerr << "Error saving data for " << person << std::endl;
+            return;
         }
 
-        eternalData[person] = eternal;
-        transientData[person] = transient;
+        file << j.dump(4);
         file.close();
     }
-}
 
-void saveData(const std::string &person)
-{
-    ensureDataFolderExists();
-    std::ofstream file(DATA_FOLDER + "/" + person + ".txt");
-    if (!file.is_open())
+    const std::unordered_map<std::string, std::vector<EternalEntry>> &getEternalData() const
     {
-        std::cerr << "Error saving data for " << person << std::endl;
-        return;
+        return eternalData;
     }
 
-    for (const auto &info : eternalData[person])
+    const std::unordered_map<std::string, std::vector<TransientEntry>> &getTransientData() const
     {
-        file << info << std::endl;
-    }
-    file << std::endl
-         << std::endl;
-    for (const auto &info : transientData[person])
-    {
-        file << info << std::endl;
+        return transientData;
     }
 
-    file.close();
-}
+    void addEternalData(const std::string &person, const EternalEntry &data)
+    {
+        eternalData[person].push_back(data);
+        saveData(person);
+    }
+
+    void addTransientData(const std::string &person, const TransientEntry &data)
+    {
+        transientData[person].push_back(data);
+        saveData(person);
+    }
+
+private:
+    const std::string DATA_FOLDER = "data";
+    std::unordered_map<std::string, std::vector<EternalEntry>> eternalData;
+    std::unordered_map<std::string, std::vector<TransientEntry>> transientData;
+
+    DataManager()
+    {
+        ensureDataFolderExists();
+        loadData();
+    }
+
+    void ensureDataFolderExists()
+    {
+        if (!std::filesystem::exists(DATA_FOLDER))
+        {
+            std::filesystem::create_directory(DATA_FOLDER);
+        }
+    }
+};
 
 void listPeople()
 {
+    const auto &dataManager = DataManager::getInstance();
+    const auto &eternalData = dataManager.getEternalData();
+    const auto &transientData = dataManager.getTransientData();
+
     if (eternalData.empty() && transientData.empty())
     {
-        std::cout << "  :(" << std::endl;
         return;
     }
 
@@ -109,52 +188,51 @@ void listPeople()
 
 void showPersonInfo(const std::string &person)
 {
+    const auto &dataManager = DataManager::getInstance();
+    const auto &eternalData = dataManager.getEternalData();
+    const auto &transientData = dataManager.getTransientData();
+
     std::cout << "Eternal: ";
-    if (eternalData.find(person) != eternalData.end() && !eternalData[person].empty())
+    auto it1 = eternalData.find(person);
+    if (it1 != eternalData.end() && !it1->second.empty())
     {
-        std::cout << eternalData[person].front();
+        std::cout << it1->second.front().text << std::endl;
     }
-    else
-    {
-        std::cout << ":(" << std::endl;
-    }
-    std::cout << std::endl;
 
     std::cout << "Transient: " << std::endl;
-    if (transientData.find(person) != transientData.end())
+    auto it2 = transientData.find(person);
+    if (it2 != transientData.end())
     {
-        for (const auto &info : transientData[person])
+        for (const TransientEntry &entry : it2->second)
         {
-            std::cout << "  * " << info << std::endl;
+            std::time_t time = std::chrono::system_clock::to_time_t(entry.timestamp);
+            std::cout << "  " << std::put_time(std::localtime(&time), "%Y-%m-%d") << ": " << entry.text << std::endl;
         }
     }
-    else
+}
+
+void editEternalInfo(const std::string &person, const std::string &entry)
+{
+    if (entry.find_first_not_of(" \t\n\v\f\r") == std::string::npos)
     {
-        std::cout << " :(" << std::endl;
-    }
-}
-
-void editEternalInfo(const std::string &person, std::string &entry)
-{
-    if(entry.find_first_not_of(' \t\n\v\f\r') == std::string::npos) {
-        std::cout << ":(" << std::endl;
-        return;
-    
-    }
-    eternalData[person].insert(eternalData[person].begin(), entry);
-    saveData(person);
-    std::cout << ":)" << std::endl;
-}
-
-void addTransientEntry(const std::string &person, std::string &entry)
-{
-    if(entry.find_first_not_of(" \t\n\v\f\r") == std::string::npos) {
-        std::cout << ":(" << std::endl;
         return;
     }
-    transientData[person].insert(transientData[person].begin(), entry);
-    saveData(person);
-    std::cout << ":)" << std::endl;
+    auto &dataManager = DataManager::getInstance();
+    EternalEntry formattedEntry = {entry, std::chrono::system_clock::now()};
+    dataManager.addEternalData(person, formattedEntry);
+    showPersonInfo(person);
+}
+
+void addTransientEntry(const std::string &person, const std::string &entry)
+{
+    if (entry.find_first_not_of(" \t\n\v\f\r") == std::string::npos)
+    {
+        return;
+    }
+    auto &dataManager = DataManager::getInstance();
+    TransientEntry formattedEntry = {entry, std::chrono::system_clock::now()};
+    dataManager.addTransientData(person, formattedEntry);
+    showPersonInfo(person);
 }
 
 void printUsage()
@@ -171,7 +249,7 @@ void printUsage()
 
 int main(int argc, char *argv[])
 {
-    loadData();
+    DataManager &dataManager = DataManager::getInstance();
 
     if (argc == 1)
     {
