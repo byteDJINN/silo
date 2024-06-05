@@ -1,4 +1,12 @@
-## Running
+## Running - cmake
+
+```
+cd build
+cmake ..
+cmake --build .
+```
+
+## Running - Docker
 
 ### Pulling and running
 ```

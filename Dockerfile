@@ -2,16 +2,19 @@
 FROM alpine:latest
 
 # Install necessary packages
-RUN apk add --no-cache g++ make
+RUN apk add --no-cache g++
+RUN apk add --no-cache make
+RUN apk add --no-cache cmake
 
 # Set the working directory
 WORKDIR /usr/src/app
 
-COPY silo.cpp ./
+COPY main.cpp CMakeLists.txt ./
 COPY deps ./deps
 
 # Compile the C++ code
-RUN g++ -o silo silo.cpp
+RUN mkdir build
+RUN cd build && cmake .. && cmake --build .
 
 # Set the entrypoint to the compiled binary
-ENTRYPOINT ["./silo"]
+ENTRYPOINT ["./build/silo"]
